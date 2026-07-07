@@ -1,6 +1,6 @@
 {
   "name": "matchu-patchu-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server exposing matchu-patchu — the unified-diff patcher that's tolerant of form, strict about intent — as a patch tool.",
   "license": "Apache-2.0",
   "author": "Ben Albahari",
@@ -24,7 +24,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc --build"
+    "build": "tsc --build",
+    "prepublishOnly": "tsc --build"
   },
   "dependencies": {
     "matchu-patchu": "workspace:^",

@@ -8,6 +8,15 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { Patcher, PatchInputFile, PatchParserException } from 'matchu-patchu';
 import { z } from 'zod';
 
+const PkgVersion = (() => {
+  try {
+    const self = fileURLToPath(import.meta.url);
+    return JSON.parse(readFileSync(join(dirname(self), '..', 'package.json'), 'utf-8')).version ?? '?';
+  } catch {
+    return '?';
+  }
+})();
+
 // Every reply names the serving build: rebuilds don't respawn an already-running server
 // process, so a stale process silently serving old behavior stays visible to callers.
 // The patcher dep is a live symlink, so its entry mtime counts too.
@@ -16,10 +25,9 @@ const BuildStamp = (() => {
     const self = fileURLToPath(import.meta.url);
     const patcherEntry = createRequire(import.meta.url).resolve('matchu-patchu');
     const built = new Date(Math.max(statSync(self).mtimeMs, statSync(patcherEntry).mtimeMs));
-    const version = JSON.parse(readFileSync(join(dirname(self), '..', 'package.json'), 'utf-8')).version ?? '?';
     const p = (n: number) => String(n).padStart(2, '0');
     const ts = `${built.getFullYear()}-${p(built.getMonth() + 1)}-${p(built.getDate())} ${p(built.getHours())}:${p(built.getMinutes())}:${p(built.getSeconds())}`;
-    return `[matchu-patchu-mcp ${version}, built ${ts}]`;
+    return `[matchu-patchu-mcp ${PkgVersion}, built ${ts}]`;
   } catch {
     return '[matchu-patchu-mcp build unknown]';
   }
@@ -76,7 +84,7 @@ function applyCore(filePath: string, diff: string, dryRun: boolean): { ok: boole
 }
 
 const server = new McpServer(
-  { name: 'patcher', version: '0.1.0' },
+  { name: 'patcher', version: PkgVersion },
   {
     instructions:
       'Use this tool when you run into (or anticipate) whitespace or other issues with exact string replacement tools, or when you have many small edits that you want to apply efficiently to a file in one step.',
