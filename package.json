@@ -1,0 +1,10 @@
+{
+  "name": "matchu-patchu-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm recursive run build",
+    "test": "pnpm --filter matchu-patchu test"
+  },
+  "packageManager": "pnpm@10.19.0"
+}

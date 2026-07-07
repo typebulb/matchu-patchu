@@ -1,0 +1,37 @@
+{
+  "name": "matchu-patchu-mcp",
+  "version": "0.1.0",
+  "description": "MCP server exposing matchu-patchu — the unified-diff patcher that's tolerant of form, strict about intent — as a patch tool.",
+  "license": "Apache-2.0",
+  "author": "Ben Albahari",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typebulb/matchu-patchu.git",
+    "directory": "patcher-mcp"
+  },
+  "homepage": "https://github.com/typebulb/matchu-patchu/tree/main/patcher-mcp#readme",
+  "bugs": "https://github.com/typebulb/matchu-patchu/issues",
+  "type": "module",
+  "bin": {
+    "matchu-patchu-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "matchu-patchu": "workspace:^",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^3.25"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.8.3"
+  }
+}
