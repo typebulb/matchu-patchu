@@ -24,6 +24,27 @@ Or in any MCP client configuration:
 
 See the [matchu-patchu README](https://www.npmjs.com/package/matchu-patchu) for what the patcher tolerates, fuzz scores, and when to prefer it over exact string replacement.
 
+## Troubleshooting
+
+**`npx matchu-patchu-mcp` crashes with `Cannot read properties of null (reading 'package')`** — this is an npm bug, not a package bug: npx scans the *current project's* `node_modules` before downloading anything, and that scan is known to crash in some pnpm workspaces (e.g. links whose target lives inside the same project tree). Work around it by installing globally and invoking the bin directly:
+
+```bash
+npm i -g matchu-patchu-mcp
+claude mcp add --scope user patcher -- matchu-patchu-mcp
+```
+
+**Windows, JSON-based MCP configs** — `npx` isn't directly spawnable on Windows; wrap it:
+
+```json
+{
+  "mcpServers": {
+    "patcher": { "command": "cmd", "args": ["/c", "npx", "matchu-patchu-mcp"] }
+  }
+}
+```
+
+(A global install sidesteps this too: `"command": "matchu-patchu-mcp"` works as-is.)
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
