@@ -13,7 +13,7 @@ export class Patcher {
         const fileKeys = files.map(f => f.Key);
         const fileContents = new Map(files.map(f => [f.Key, f.InputFullText]));
         diff = options.SanitizeDiff ? DiffSanitizer.Process(diff, fileKeys) : diff;
-        const fileHunks = UnifiedDiffParser.Parse(diff, fileContents, options.Truncation);
+        const fileHunks = UnifiedDiffParser.Parse(diff, fileContents, options.Truncation, options.ControlChars);
 
         // Hunks naming files outside the input set are ignored by design (a hunk for
         // a file we don't hold must not be guessed at) — but loudly: silent drops
@@ -45,7 +45,8 @@ export class Patcher {
                 hunks.flatMap(h => h.Lines)
                      .filter(l => l.CollapsedFrom != null)
                      .map(l => l.CollapsedFrom!),
-                hunks.some(h => h.TruncationSuspected)
+                hunks.some(h => h.TruncationSuspected),
+                hunks.some(h => h.ControlCharsSuspected)
             );
         });
         const output = new PatchOutput(patchOutputFiles);

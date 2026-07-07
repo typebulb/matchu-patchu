@@ -14,6 +14,17 @@ export class PatchInputFile { constructor (public Key: string, public InputFullT
 // (e.g. the differential test harness) for raw-text channels where token cutoffs are real.
 export type TruncationPolicy = 'error' | 'warn' | 'ignore';
 
+// Verdict for INSERT lines carrying raw control characters (C0 minus tab/LF/CR/FF,
+// plus DEL) — direct content evidence of transport damage with no legitimate
+// reading (a written NUL turns the target "binary" for much of the toolchain).
+// 'error' (the default — deliberately the opposite default to TruncationPolicy,
+// whose signature is a mere count mismatch) rejects the whole diff at parse time,
+// naming the offending code points. 'warn' applies AND sets
+// PatchOutputFile.ControlCharsSuspected; 'ignore' applies silently. Delete/context
+// lines are never policed: they are assertions about existing file content,
+// resolved by matching — and deleting an already-damaged line must stay possible.
+export type ControlCharPolicy = 'error' | 'warn' | 'ignore';
+
 export class PatchOptions {
     constructor (
         public ContinueOnError: boolean                   = true,
@@ -23,7 +34,8 @@ export class PatchOptions {
         // Appended after the originals: prepending SanitizeDiff silently retargeted
         // external positional callers (new PatchOptions(false) meant ContinueOnError).
         public SanitizeDiff: boolean                      = true,
-        public Truncation: TruncationPolicy               = 'warn'
+        public Truncation: TruncationPolicy               = 'warn',
+        public ControlChars: ControlCharPolicy            = 'error'
     ) {}
 }
 
@@ -45,7 +57,11 @@ export class PatchOutputFile {
         // True when the final hunk carried the tear signature under
         // TruncationPolicy 'warn' — the diff may have been cut off in generation, so
         // callers should disclose it and have the tail of the change verified.
-        public TruncationSuspected: boolean = false
+        public TruncationSuspected: boolean = false,
+        // True when any hunk's insert lines carried raw control characters under
+        // ControlCharPolicy 'warn' — the content was applied verbatim, so callers
+        // should disclose it and have the written bytes verified.
+        public ControlCharsSuspected: boolean = false
     ) {}
 }
 
@@ -102,6 +118,10 @@ export class Hunk {
     // Set by the parser under TruncationPolicy 'warn' on the final hunk when it
     // carried the tear signature.
     public TruncationSuspected = false;
+
+    // Set by the parser under ControlCharPolicy 'warn' when this hunk's insert
+    // lines carried raw control characters.
+    public ControlCharsSuspected = false;
 }
     
 export class Edit {

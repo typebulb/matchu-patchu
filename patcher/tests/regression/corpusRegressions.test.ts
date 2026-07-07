@@ -544,4 +544,56 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     expect(result.Files[0].Errors.filter(e => e.Type == 'MatchNotFound').length).toBe(1)
     expect(result.Files[0].AlreadyAppliedCount).toBe(0)
   })
+
+  // Production capture 2026-07: a raw NUL byte in a replacement string was applied
+  // verbatim, turning the target file "binary" for grep and friends — silent
+  // corruption, the exact failure class the philosophy forbids. A raw control
+  // character in an INSERT line is provable damage from the diff alone (no target
+  // needed), so the 'error' policy — the DEFAULT — rejects at parse time,
+  // all-or-nothing, naming the offending code points.
+  it('NUL in insert line rejects at parse time under the default policy', () => {
+    const original = 'alpha\nbeta\n'
+    const patch = '@@ -1,2 +1,2 @@\n alpha\n-beta\n+be\0ta\n'
+
+    expect(() => Patcher.Apply(patch, TestHelpers.singleFile(original))).toThrow(/control.*U\+0000/s)
+  })
+
+  // 'warn' applies and surfaces PatchOutputFile.ControlCharsSuspected — the
+  // TruncationSuspected channel shape — for callers that would rather disclose
+  // than block (e.g. a pipeline that post-audits its writes).
+  it('NUL in insert line applies and discloses under warn policy', () => {
+    const original = 'alpha\nbeta\n'
+    const patch = '@@ -1,2 +1,2 @@\n alpha\n-beta\n+be\0ta\n'
+
+    const options = new PatchOptions()
+    options.ControlChars = 'warn'
+    const result = Patcher.Apply(patch, TestHelpers.singleFile(original), options)
+    expect(result.Files[0].OutputFullText).toBe('alpha\nbe\0ta\n')
+    expect(result.Files[0].ControlCharsSuspected).toBe(true)
+    expect(result.Files[0].Errors.length).toBe(0)
+  })
+
+  // Pins the suspect-set boundary: tab is content and form feed is a real (if
+  // archaic) page-break character — both apply untouched under the DEFAULT policy.
+  it('tab and form-feed inserts apply under the default policy', () => {
+    const original = 'alpha\nbeta\n'
+    const patch = '@@ -1,2 +1,3 @@\n alpha\n beta\n+col1\tcol2\n+\f\n'
+
+    const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
+    expect(result.Files[0].OutputFullText).toBe('alpha\nbeta\ncol1\tcol2\n\f\n')
+    expect(result.Files[0].ControlCharsSuspected).toBe(false)
+    expect(result.Files[0].Errors.length).toBe(0)
+  })
+
+  // Pins insert-only scope: delete lines are the caller's assertions about EXISTING
+  // file content, resolved by matching — policing them would prevent deleting an
+  // already-damaged line, which is precisely the repair a NUL incident needs.
+  it('NUL in delete line is not policed and the deletion applies', () => {
+    const original = 'alpha\nbe\0ta\ngamma\n'
+    const patch = '@@ -1,3 +1,2 @@\n alpha\n-be\0ta\n gamma\n'
+
+    const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
+    expect(result.Files[0].OutputFullText).toBe('alpha\ngamma\n')
+    expect(result.Files[0].Errors.length).toBe(0)
+  })
 })

@@ -34,6 +34,11 @@ DIFF
 - Whitespace drift, Unicode homoglyphs, invisible characters — matched through escalating fuzz passes.
 - **Atomic** — all hunks apply or none do. Duplicate hunks dedupe silently.
 
+### What it refuses (by design)
+
+- **Raw control characters in inserted lines** (a NUL, a stray ESC — C0 controls other than tab/newline/form feed) are rejected loudly by default, naming the offending code points: they're transport damage, not content, and writing them corrupts the target for much of the toolchain. Opt out per call with the `controlChars` policy (`'error'` | `'warn'` | `'ignore'`; `'warn'` applies and sets `ControlCharsSuspected`). Delete/context lines are never policed — deleting an already-damaged line stays possible.
+- **Truncated diffs**: a final hunk that ends mid-change-run with its header promising more than the body delivered looks like a token cutoff. The default (`truncation: 'warn'`) applies and sets `TruncationSuspected`; raw-text channels can opt into `'error'`.
+
 ### Fuzz scores
 
 Fuzz is the accumulated looseness cost across matched lines: 0 (unreported) means every hunk matched exactly; ~1/line means trailing-whitespace differences; ~100/line means an indentation-insensitive match; 200+/line means Unicode normalization (homoglyphs, invisibles) was needed. High fuzz means the patch applied, but the anchors were shaky — worth a glance at the result.

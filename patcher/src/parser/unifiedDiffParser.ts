@@ -1,5 +1,5 @@
 import { Header, HunkBuilder } from './hunkBuilder.js';
-import { FileHunkGroup, TruncationPolicy } from '../models.js';
+import { FileHunkGroup, TruncationPolicy, ControlCharPolicy, LineType } from '../models.js';
 import { DiffContentHeuristics } from './heuristics.js';
 import { PatchParserException } from '../exceptions.js';
 import { ArrayUtils } from '../utils/arrayUtils.js';
@@ -15,10 +15,12 @@ export class UnifiedDiffParser
      * @param diff - The diff text to parse
      * @param files - Map of filename to content (content used for disambiguation of ambiguous lines)
      * @param truncation - Verdict for a surviving tear signature on the final hunk
+     * @param controlChars - Verdict for raw control characters in insert lines
      */
-    public static Parse(diff: string, files: Map<string, string>, truncation: TruncationPolicy = 'warn')
+    public static Parse(diff: string, files: Map<string, string>, truncation: TruncationPolicy = 'warn',
+                        controlChars: ControlCharPolicy = 'error')
     {
-        const hunks = (diff == null || diff.trim().length == 0) ? [] : UnifiedDiffParser.ParseHunks(diff, files, truncation);
+        const hunks = (diff == null || diff.trim().length == 0) ? [] : UnifiedDiffParser.ParseHunks(diff, files, truncation, controlChars);
 
         const fileKeySet = new Set<string>(files.keys());
         const headerless       = hunks.filter(h => h.Key == null || h.Key == "");
@@ -56,7 +58,8 @@ export class UnifiedDiffParser
         return groups;
     }
 
-    static ParseHunks(diff: string, fileContents?: Map<string, string>, truncation: TruncationPolicy = 'warn') {
+    static ParseHunks(diff: string, fileContents?: Map<string, string>, truncation: TruncationPolicy = 'warn',
+                      controlChars: ControlCharPolicy = 'error') {
         const hunkBuilder = new HunkBuilder();
         const body: string[] = [];
         let header  = new Header();
@@ -132,8 +135,45 @@ export class UnifiedDiffParser
             if (hunks.length > 0)
                 hunks[hunks.length - 1].TruncationSuspected = true;
         }
+        // Raw control chars in INSERT lines are provable transport damage from the
+        // diff alone (a written NUL turns the target "binary"); delete/context lines
+        // are match-side assertions and stay unpoliced. Suspect set: C0 minus
+        // tab/LF/CR/FF (tab is content, LF never survives splitting, CR is CRLF
+        // plumbing, FF is a legitimate page break), plus DEL.
+        if (controlChars != 'ignore') {
+            for (const hunk of hunks) {
+                const suspect = UnifiedDiffParser.DescribeControlChars(
+                    hunk.Lines.filter(l => l.Type == LineType.Insert).map(l => l.Text));
+                if (suspect == null) continue;
+                if (controlChars == 'error')
+                    throw new PatchParserException(
+                        `Insert lines contain raw control characters (${suspect}) — almost certainly ` +
+                        "transport damage, not intended content. Nothing was applied; re-send the " +
+                        "diff with the intended text (or opt into the 'warn'/'ignore' policy).");
+                hunk.ControlCharsSuspected = true;
+            }
+        }
         return hunks;
     }        
+
+        static IsSuspectControlChar(c: string): boolean {
+            const cp = c.charCodeAt(0);
+            return (cp < 0x20 && c != '\t' && c != '\n' && c != '\r' && c != '\f') || cp == 0x7F;
+        }
+
+        // "U+0000 x2, U+001B x1" — names the invisible damage so the caller can see it.
+        static DescribeControlChars(lines: string[]): string | null {
+            const counts = new Map<string, number>();
+            for (const line of lines)
+                for (const c of line)
+                    if (UnifiedDiffParser.IsSuspectControlChar(c))
+                        counts.set(c, (counts.get(c) ?? 0) + 1);
+            if (counts.size == 0) return null;
+            return [...counts.entries()]
+                .sort((a, b) => a[0].charCodeAt(0) - b[0].charCodeAt(0))
+                .map(([c, n]) => `U+${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} x${n}`)
+                .join(', ');
+        }
 
     static readonly MetaPrefixes = [
         "index ", "new file mode ", "deleted file mode ", "similarity index ",
