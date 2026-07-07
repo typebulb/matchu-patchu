@@ -33,6 +33,41 @@ const BuildStamp = (() => {
   }
 })();
 
+// First contact: an MCP client spawns this bin with no args and piped stdio, so any
+// arg — or a TTY on stdin — means a person (or their agent) ran it directly, usually
+// while trying to figure out how to install it. Print the critical setup facts and
+// exit instead of silently waiting for a JSON-RPC handshake that will never come.
+const argv = process.argv.slice(2);
+if (argv.includes('--version') || argv.includes('-v')) {
+  console.log(PkgVersion);
+  process.exit(0);
+}
+if (argv.length > 0 || process.stdin.isTTY) {
+  console.log(`matchu-patchu-mcp ${PkgVersion} — an MCP server speaking JSON-RPC over stdio, not an interactive CLI.
+(Run with no arguments by an MCP client, it serves; it was waiting for a client handshake, not hanging.)
+
+Register with Claude Code (copy exactly — each flag matters):
+
+  claude mcp add --scope user patcher -- npx -y matchu-patchu-mcp@latest
+
+  -y        skips npx's first-run install prompt, which would hang the server spawn
+  @latest   re-resolves against the registry each session start, so updates arrive automatically
+
+Any other MCP client, in its JSON config (complete document — the top-level key must be "mcpServers"):
+
+  { "mcpServers": { "patcher": { "command": "npx", "args": ["-y", "matchu-patchu-mcp@latest"] } } }
+
+  (For Claude Code project scope this JSON belongs in .mcp.json at the project ROOT.)
+
+Then restart the session — MCP tools load at session startup — and verify:
+
+  claude mcp list        # expect: patcher ... Connected
+
+Tool exposed: patch(filePath, diff, dryRun?) — applies unified diffs; tolerant of form, strict about intent.
+Docs: https://www.npmjs.com/package/matchu-patchu-mcp`);
+  process.exit(0);
+}
+
 function applyCore(filePath: string, diff: string, dryRun: boolean): { ok: boolean; message: string; patched?: string } {
   if (!existsSync(filePath))
     return { ok: false, message: `Error: file not found: ${filePath}` };

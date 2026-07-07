@@ -14,6 +14,8 @@ claude mcp add --scope user patcher -- npx -y matchu-patchu-mcp@latest
 
 (`-y` skips npx's first-run install prompt, which would otherwise hang the server spawn; `@latest` re-resolves against the registry at each session start, so new sessions pick up updates automatically.)
 
+This works as-is on Windows — Claude Code spawns `npx` correctly there; no wrapper or global install needed.
+
 Then restart Claude Code — MCP servers load at session startup, so the `patch` tool won't appear until a new session. Verify with `claude mcp list`: `patcher` should show as connected.
 
 Or in any MCP client configuration:
@@ -39,7 +41,7 @@ claude mcp add --scope user patcher -- matchu-patchu-mcp
 
 (This form pins to the globally installed version — rerun `npm i -g matchu-patchu-mcp` to update.)
 
-**Windows, JSON-based MCP configs** — `npx` isn't directly spawnable on Windows; wrap it:
+**Windows, MCP clients other than Claude Code** — some clients can't spawn `npx` directly on Windows (it's a `.cmd` shim, not an `.exe`). Claude Code handles this itself, so the Setup command above needs no change; for a client that doesn't, wrap it — this keeps `@latest` auto-updates:
 
 ```json
 {
@@ -49,7 +51,7 @@ claude mcp add --scope user patcher -- matchu-patchu-mcp
 }
 ```
 
-(A global install sidesteps this too: `"command": "matchu-patchu-mcp"` works as-is.)
+(A global install also sidesteps this — `"command": "matchu-patchu-mcp"` works as-is — but pins the installed version; prefer the `cmd /c` wrapper.)
 
 ## License
 
