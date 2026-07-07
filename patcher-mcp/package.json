@@ -1,6 +1,6 @@
 {
   "name": "matchu-patchu-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "MCP server exposing matchu-patchu — the unified-diff patcher that's tolerant of form, strict about intent — as a patch tool.",
   "license": "Apache-2.0",
   "author": "Ben Albahari",
@@ -11,6 +11,18 @@
   },
   "homepage": "https://github.com/typebulb/matchu-patchu/tree/main/patcher-mcp#readme",
   "bugs": "https://github.com/typebulb/matchu-patchu/issues",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "claude-code",
+    "diff",
+    "patch",
+    "unified-diff",
+    "apply-patch",
+    "llm",
+    "ai-agent",
+    "code-editing"
+  ],
   "type": "module",
   "bin": {
     "matchu-patchu-mcp": "./dist/index.js"

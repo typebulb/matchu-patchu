@@ -1,6 +1,6 @@
 # matchu-patchu
 
-**The unified-diff patcher that's tolerant of form, strict about intent.** Repairs sloppy AI-generated diffs — fuzzy-matched anchors, mangled headers, whitespace drift — when the intent is unambiguous, and fails atomically with a precise, typed error when it isn't. A pure, zero-dependency TypeScript library with a thin CLI — built for a world where LLMs write the diffs and the diffs are almost right.
+**The unified-diff patcher that's tolerant of form, strict about intent.** Repairs sloppy AI-generated diffs — fuzzy-matched anchors, mangled headers, whitespace drift — when the intent is unambiguous, and fails atomically with a precise, typed error when it isn't. A pure, zero-dependency TypeScript library with a thin CLI, plus a companion [MCP server](https://www.npmjs.com/package/matchu-patchu-mcp) for Claude Code and other MCP clients — built for a world where LLMs write the diffs and the diffs are almost right.
 
 This README doubles as the agent skill: `npx matchu-patchu skill` prints it wrapped in Agent Skills (SKILL.md) frontmatter.
 

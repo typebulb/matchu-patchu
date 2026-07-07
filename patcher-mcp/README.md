@@ -12,6 +12,8 @@ An MCP (Model Context Protocol) server exposing [matchu-patchu](https://www.npmj
 claude mcp add --scope user patcher -- npx matchu-patchu-mcp
 ```
 
+Then restart Claude Code — MCP servers load at session startup, so the `patch` tool won't appear until a new session. Verify with `claude mcp list`: `patcher` should show as connected.
+
 Or in any MCP client configuration:
 
 ```json
