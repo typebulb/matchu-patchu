@@ -9,8 +9,10 @@ An MCP (Model Context Protocol) server exposing [matchu-patchu](https://www.npmj
 ## Setup
 
 ```bash
-claude mcp add --scope user patcher -- npx matchu-patchu-mcp
+claude mcp add --scope user patcher -- npx -y matchu-patchu-mcp@latest
 ```
+
+(`-y` skips npx's first-run install prompt, which would otherwise hang the server spawn; `@latest` re-resolves against the registry at each session start, so new sessions pick up updates automatically.)
 
 Then restart Claude Code — MCP servers load at session startup, so the `patch` tool won't appear until a new session. Verify with `claude mcp list`: `patcher` should show as connected.
 
@@ -19,7 +21,7 @@ Or in any MCP client configuration:
 ```json
 {
   "mcpServers": {
-    "patcher": { "command": "npx", "args": ["matchu-patchu-mcp"] }
+    "patcher": { "command": "npx", "args": ["-y", "matchu-patchu-mcp@latest"] }
   }
 }
 ```
@@ -35,12 +37,14 @@ npm i -g matchu-patchu-mcp
 claude mcp add --scope user patcher -- matchu-patchu-mcp
 ```
 
+(This form pins to the globally installed version — rerun `npm i -g matchu-patchu-mcp` to update.)
+
 **Windows, JSON-based MCP configs** — `npx` isn't directly spawnable on Windows; wrap it:
 
 ```json
 {
   "mcpServers": {
-    "patcher": { "command": "cmd", "args": ["/c", "npx", "matchu-patchu-mcp"] }
+    "patcher": { "command": "cmd", "args": ["/c", "npx", "-y", "matchu-patchu-mcp@latest"] }
   }
 }
 ```

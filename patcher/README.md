@@ -74,7 +74,7 @@ Multi-file patches: pass one `PatchInputFile` per file; hunks are routed by the 
 The companion `matchu-patchu-mcp` package exposes a `patch` tool (`filePath`, `diff`, `dryRun`) over stdio:
 
 ```bash
-claude mcp add --scope user patcher -- npx matchu-patchu-mcp
+claude mcp add --scope user patcher -- npx -y matchu-patchu-mcp@latest
 ```
 
 ## Skill
