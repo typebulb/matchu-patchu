@@ -37,7 +37,7 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "prepublishOnly": "tsc --build"
+    "prepublishOnly": "node ../scripts/require-pnpm.mjs && tsc --build"
   },
   "dependencies": {
     "matchu-patchu": "workspace:^",
