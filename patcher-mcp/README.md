@@ -14,9 +14,17 @@ claude mcp add --scope user patcher -- npx -y matchu-patchu-mcp@latest
 
 (`-y` skips npx's first-run install prompt, which would otherwise hang the server spawn; `@latest` re-resolves against the registry at each session start, so new sessions pick up updates automatically.)
 
+**In a pnpm workspace, use pnpm's runner instead** — an npm bug ([npm/cli#4787](https://github.com/npm/cli/issues/4787)) makes `npx` crash there (see Troubleshooting):
+
+```bash
+claude mcp add --scope user patcher -- pnpm dlx matchu-patchu-mcp@latest
+```
+
+(Same auto-updates — `pnpm dlx` re-resolves `@latest` when its cache expires, at most daily.)
+
 This works as-is on Windows — Claude Code spawns `npx` correctly there; no wrapper or global install needed.
 
-Then restart Claude Code — MCP servers load at session startup, so the `patch` tool won't appear until a new session. Verify with `claude mcp list`: `patcher` should show as connected.
+Then restart Claude Code — MCP servers load at session startup, so the `patch` tool won't appear until a new session. The same applies to updates: a running session keeps serving the build it started with; a new version takes effect on the next session (or `/mcp` reconnect). To verify which build is serving, make any `patch` call (`dryRun: true` works) — every reply ends with a version + build-time tag.
 
 Or in any MCP client configuration:
 
@@ -32,14 +40,7 @@ See the [matchu-patchu README](https://www.npmjs.com/package/matchu-patchu) for 
 
 ## Troubleshooting
 
-**`npx matchu-patchu-mcp` crashes with `Cannot read properties of null (reading 'package')`** — this is an npm bug, not a package bug: npx scans the *current project's* `node_modules` before downloading anything, and that scan is known to crash in some pnpm workspaces (e.g. links whose target lives inside the same project tree). Work around it by installing globally and invoking the bin directly:
-
-```bash
-npm i -g matchu-patchu-mcp
-claude mcp add --scope user patcher -- matchu-patchu-mcp
-```
-
-(This form pins to the globally installed version — rerun `npm i -g matchu-patchu-mcp` to update.)
+**`npx matchu-patchu-mcp` crashes with `Cannot read properties of null (reading 'package')`** — this is an npm bug ([npm/cli#4787](https://github.com/npm/cli/issues/4787), unfixed as of npm 11), not a package bug: npx scans the *current project's* `node_modules` before downloading anything, and that scan crashes in some pnpm workspaces (e.g. links whose target lives inside the same project tree). The fix is the pnpm registration form from Setup — `pnpm dlx matchu-patchu-mcp@latest` — which never runs npm's scan and keeps auto-updates.
 
 **Windows, MCP clients other than Claude Code** — some clients can't spawn `npx` directly on Windows (it's a `.cmd` shim, not an `.exe`). Claude Code handles this itself, so the Setup command above needs no change; for a client that doesn't, wrap it — this keeps `@latest` auto-updates:
 
