@@ -130,6 +130,7 @@ server.tool(
   'patch',
   `Apply a unified diff to a file using context matching (line numbers in @@ headers are optional and nearly always ignored).
 Accepts lenient diff formats: bare @@ headers, git a/b prefixes, decorated headers, missing line prefixes.
+Matching is line-based: quote whole physical lines — a prose paragraph is often ONE long line.
 Atomic: either all hunks apply or none do. Duplicate hunks are silently deduplicated.
 Returns a success message, or an error message describing why the patch failed.`,
   {
