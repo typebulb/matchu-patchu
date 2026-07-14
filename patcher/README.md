@@ -36,6 +36,7 @@ DIFF
 
 ### What it refuses (by design)
 
+- **Partial lines**: matching is line-based — quote whole physical lines. In markdown prose, a whole paragraph is often a single long line; quote it in full.
 - **Raw control characters in inserted lines** (a NUL, a stray ESC — C0 controls other than tab/newline/form feed) are rejected loudly by default, naming the offending code points: they're transport damage, not content, and writing them corrupts the target for much of the toolchain. Opt out per call with the `controlChars` policy (`'error'` | `'warn'` | `'ignore'`; `'warn'` applies and sets `ControlCharsSuspected`). Delete/context lines are never policed — deleting an already-damaged line stays possible.
 - **Truncated diffs**: a final hunk that ends mid-change-run with its header promising more than the body delivered looks like a token cutoff. The default (`truncation: 'warn'`) applies and sets `TruncationSuspected`; raw-text channels can opt into `'error'`.
 

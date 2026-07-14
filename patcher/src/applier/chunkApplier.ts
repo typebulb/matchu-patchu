@@ -8,6 +8,7 @@ import { DuplicateGuard } from './guards.js';
 import { OverlapGuard } from './guards.js';
 import { EditMinimizer } from './editMinimizer.js';
 import { Indenter } from './indenter.js';
+import { MatchHint } from './matchHint.js';
 
 export class InputChunks { constructor(public InputFullText: string, public Chunks: Chunk[], public Options: PatchOptions) {} }
 export class OutputEdits { constructor(public OutputText: string, public Edits: Edit[], public Errors: PatchError[]) {} }
@@ -67,7 +68,7 @@ export class ChunkApplier
         if (match.IsAmbiguous)
             throw new PatchException(new PatchError("MatchAmbiguous", chunk));
         if (match.IsNotFound)
-            throw new PatchException(new PatchError("MatchNotFound", chunk));
+            throw new PatchException(new PatchError("MatchNotFound", chunk, null, MatchHint.SubLine(chunk, lines)));
     
         return new Edit(
             match.LineIndex,
