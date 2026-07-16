@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { TestHelpers } from '../helpers'
 import { Patcher, PatchInputFile, PatchOptions, PatchException } from '../../dist/index.js'
 
 const project = () => [
@@ -37,7 +38,6 @@ describe('Multi-input changesets', () => {
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
     expect(result.Files[2].OutputFullText).toBe('<div id="root"></div>\n')
     for (const f of result.Files) expect(f.Errors.length).toBe(0)
-    expect(result.Errors.length).toBe(0)
   })
 
   it('routes git a/b-prefixed headers to bare keys', () => {
@@ -57,24 +57,21 @@ describe('Multi-input changesets', () => {
 
     expect(result.Files[0].OutputFullText).toBe('const a = 10\nconst b = 2\n')
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
-    expect(result.Errors.length).toBe(0)
   })
 
   // Pins current behavior: only git a/ b/ prefixes canonicalize; ./ fails loud.
   // If ./ tolerance is ever adopted, this is the test that flips.
-  it('./-prefixed headers do not route — loud FileMismatch, file untouched', () => {
+  it('./-prefixed headers do not route — FileMismatch throws', () => {
     const patch = `--- ./styles.css
 +++ ./styles.css
 @@ -1,1 +1,1 @@
 -body { color: red }
 +body { color: blue }
 `
-    const result = Patcher.Apply(patch, project())
-
-    expect(result.Files[1].OutputFullText).toBe('body { color: red }\n')
-    expect(result.Files[1].Errors.length).toBe(0)
-    expect(result.Errors.filter(e => e.Type === 'FileMismatch').length).toBe(1)
-    expect(result.Errors[0].FileKey).toBe('./styles.css')
+    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, project()))
+    expect(ex.Error.Type).toBe('FileMismatch')
+    expect(ex.Error.FileKey).toBe('./styles.css')
+    expect(ex.Error.Hint).toContain('styles.css') // roster in the hint
   })
 
   it('keeps output order = input order even when the diff orders files differently', () => {
@@ -122,7 +119,6 @@ describe('Multi-input changesets', () => {
 
     expect(result.Files[0].OutputFullText).toBe('const a = 10\nconst b = 2\nconst c = 30\n')
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
-    expect(result.Errors.length).toBe(0)
   })
 
   it('fills an empty-content key with an insert-only hunk', () => {
@@ -140,7 +136,6 @@ describe('Multi-input changesets', () => {
 
     expect(result.Files[1].OutputFullText).toBe('export function scan() {\n}\n')
     expect(result.Files[0].OutputFullText).toBe('const a = 1\n')
-    expect(result.Errors.length).toBe(0)
   })
 
   it('routes a /dev/null new-file header to a held empty key', () => {
@@ -157,7 +152,6 @@ describe('Multi-input changesets', () => {
     const result = Patcher.Apply(patch, files)
 
     expect(result.Files[1].OutputFullText).toBe('export function scan() {\n}\n')
-    expect(result.Errors.length).toBe(0)
   })
 
   it('puts a match failure on the failing file and still applies siblings (default mode)', () => {
@@ -210,7 +204,6 @@ describe('Multi-input changesets', () => {
 
     expect(result.Files[0].OutputFullText).toBe('const a = 10\nconst b = 2\n')
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
-    expect(result.Errors.length).toBe(0)
   })
 
   it('routes custom-format headers (*** Update File:) to keys end-to-end', () => {
@@ -220,23 +213,20 @@ describe('Multi-input changesets', () => {
     const result = Patcher.Apply(patch, project(), options)
 
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
-    expect(result.Errors.length).toBe(0)
   })
 
-  // Pins current behavior: keys are case-sensitive. A case-drifted header surfaces a
-  // loud FileMismatch naming the drifted path; the file is left untouched.
-  it('case-mismatched headers do not route — loud FileMismatch', () => {
+  // Pins current behavior: keys are case-sensitive. A case-drifted header throws a
+  // FileMismatch naming the drifted path.
+  it('case-mismatched headers do not route — FileMismatch throws', () => {
     const patch = `--- Styles.css
 +++ Styles.css
 @@ -1,1 +1,1 @@
 -body { color: red }
 +body { color: blue }
 `
-    const result = Patcher.Apply(patch, project())
-
-    expect(result.Files[1].OutputFullText).toBe('body { color: red }\n')
-    expect(result.Errors.filter(e => e.Type === 'FileMismatch').length).toBe(1)
-    expect(result.Errors[0].FileKey).toBe('Styles.css')
+    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, project()))
+    expect(ex.Error.Type).toBe('FileMismatch')
+    expect(ex.Error.FileKey).toBe('Styles.css')
   })
 })
 
@@ -252,7 +242,6 @@ describe('Headerless routing in keyed mode', () => {
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
     expect(result.Files[0].OutputFullText).toBe('const a = 1\nconst b = 2\n')
     for (const f of result.Files) expect(f.Errors.length).toBe(0)
-    expect(result.Errors.length).toBe(0)
   })
 
   it('routes a headerless hunk when a single keyed file is held', () => {
@@ -264,7 +253,6 @@ describe('Headerless routing in keyed mode', () => {
     const result = Patcher.Apply(patch, [new PatchInputFile('code.tsx', 'const a = 1\nconst b = 2\n')])
 
     expect(result.Files[0].OutputFullText).toBe('const a = 10\nconst b = 2\n')
-    expect(result.Errors.length).toBe(0)
   })
 
   // Only hunks BEFORE any file header are routable — a bare hunk after a header belongs
@@ -284,7 +272,6 @@ describe('Headerless routing in keyed mode', () => {
 
     expect(result.Files[0].OutputFullText).toBe('const a = 10\nconst b = 2\n')
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
-    expect(result.Errors.length).toBe(0)
   })
 
   it('merges a routed headerless group into the headed group for the same file', () => {
@@ -305,10 +292,11 @@ describe('Headerless routing in keyed mode', () => {
 
     expect(result.Files[0].OutputFullText).toBe('const a = 10\nconst b = 2\nconst c = 30\n')
     expect(result.Files[1].OutputFullText).toBe('body { color: red }\n')
-    expect(result.Errors.length).toBe(0)
   })
 
-  it('errors loud when headerless content matches multiple files', () => {
+  // Routing failures are request errors — the diff is underspecified for this
+  // input set — so they throw in every mode, like a parse failure.
+  it('throws when headerless content matches multiple files', () => {
     const files = [
       new PatchInputFile('a.css', 'body { color: red }\n'),
       new PatchInputFile('b.css', 'body { color: red }\n'),
@@ -317,29 +305,20 @@ describe('Headerless routing in keyed mode', () => {
 -body { color: red }
 +body { color: blue }
 `
-    const result = Patcher.Apply(patch, files)
-
-    for (const f of result.Files) {
-      expect(f.OutputFullText).toBe(f.InputFullText)
-      expect(f.Errors.length).toBe(0)
-    }
-    expect(result.Errors.length).toBe(1)
-    expect(result.Errors[0].Type).toBe('MatchAmbiguous')
-    expect(result.Errors[0].FileKey).toBe('a.css, b.css')
-    expect(result.Errors[0].Hint).toContain('file headers')
+    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, files))
+    expect(ex.Error.Type).toBe('MatchAmbiguous')
+    expect(ex.Error.FileKey).toBe('a.css, b.css')
+    expect(ex.Error.Hint).toContain('file headers')
   })
 
-  it('errors loud when headerless content matches no file', () => {
+  it('throws when headerless content matches no file', () => {
     const patch = `@@ -1,1 +1,1 @@
 -nothing like this exists
 +replacement
 `
-    const result = Patcher.Apply(patch, project())
-
-    for (const f of result.Files) expect(f.OutputFullText).toBe(f.InputFullText)
-    expect(result.Errors.length).toBe(1)
-    expect(result.Errors[0].Type).toBe('MatchNotFound')
-    expect(result.Errors[0].Hint).toContain('file headers')
+    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, project()))
+    expect(ex.Error.Type).toBe('MatchNotFound')
+    expect(ex.Error.Hint).toContain('file headers')
   })
 
   it('throw mode: unroutable headerless hunk throws', () => {
@@ -363,7 +342,6 @@ describe('Headerless routing in keyed mode', () => {
 `
     const result = Patcher.Apply(patch, files)
 
-    expect(result.Errors.length).toBe(0)
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
     expect(result.Files[1].AlreadyAppliedCount).toBeGreaterThan(0)
   })

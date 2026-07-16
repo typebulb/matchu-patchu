@@ -185,7 +185,7 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     expect(result.Files[0].Errors.length).toBe(0)
   })
 
-  // External review 2026-07 (finding 17): the moved-lines carve-out counted a chunk's
+  // The moved-lines carve-out counted a chunk's
   // OWN deletes, so any block rewrite re-inserting its own first/last lines
   // (-if (x) { … +if (x) {) bypassed AlreadyApplied and re-applying an already-applied
   // patch — the normal agent-retry scenario — errored MatchNotFound instead of
@@ -199,7 +199,7 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     expect(result.Files[0].Errors.length).toBe(0)
   })
 
-  // External review 2026-07 (finding 18): a closing ``` fence is completion evidence
+  // A closing ``` fence is completion evidence
   // a token cutoff cannot emit, so the tear signature on a fence-closed final hunk is
   // miscount slop and must apply. (The unfenced variant of this diff rejects only
   // under the opt-in 'error' policy — see the truncated-final-hunk test above.)
@@ -254,7 +254,7 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     expect(result.Files[0].TruncationSuspected).toBe(false)
   })
 
-  // Delete-branch tear symmetry (item 2): a COMPLETE delete hunk whose old header merely
+  // Delete-branch tear symmetry: a COMPLETE delete hunk whose old header merely
   // over-counts (newDeficit == 0) is miscount slop, not a tear -- it must apply even under
   // the strict 'error' policy, mirroring the over-counted-append treatment.
   it('complete delete hunk with over-counted header applies under error policy', () => {
@@ -316,49 +316,43 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     expect(result.Files[0].Errors.length).toBe(0)
   })
 
-  // Companion to the diff-literals case — the silent half was the routing layer: in single-file
-  // mode, hunks grouped under multiple unknown header paths were dropped without
-  // a trace. The multi-file-against-one-buffer IGNORE semantics are deliberate
-  // and stay — but the ignore is now loud: each foreign file group surfaces a
-  // FileMismatch error. The channel is patch-scoped
-  // (PatchOutput.Errors), not per-file: foreign hunks are about the PATCH, and
-  // must not mark clean files failed.
-  it('foreign hunks error instead of vanishing in single-file mode', () => {
+  // A diff addressing files we don't hold is a defect of the REQUEST — provable
+  // from the diff and the input keys alone, before reading any file content — so
+  // it throws in BOTH modes, like a parse failure. ContinueOnError governs only
+  // per-file content mismatches. (These hunks were once dropped without a trace,
+  // reporting misdirected patches as clean zero-edit successes.)
+  it('foreign hunks throw in single-file mode', () => {
     const original = 'alpha\nbeta\n'
     const patch =
       '--- a/one.ts\n+++ b/one.ts\n@@ -1,1 +1,1 @@\n-alpha\n+ALPHA\n' +
       '--- a/two.ts\n+++ b/two.ts\n@@ -1,1 +1,1 @@\n-zzz\n+ZZZ\n'
 
-    const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
-    expect(result.Files[0].OutputFullText).toBe(original)
-    expect(result.Files[0].Errors.length).toBe(0)
-    expect(result.Errors.filter(e => e.Type == 'FileMismatch').length).toBe(2)
+    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, TestHelpers.singleFile(original)))
+    expect(ex.Error.Type).toBe('FileMismatch')
+    expect(ex.Errors.length).toBe(2) // every foreign group reported, not just the first
   })
 
-  // The loud ignore extends to multi-file mode: a hunk group keyed to a file
-  // outside the input set surfaces FileMismatch instead of vanishing; matching
-  // files still apply. The error lives on PatchOutput.Errors, once — clean files
-  // carry no errors, so callers gating writes on per-file Errors still write them.
-  it('foreign hunks error instead of vanishing in multi-file mode', () => {
+  // Multi-file mode: a hunk group keyed outside the input set fails the whole
+  // patch atomically — no partial apply of the matching files. The error names
+  // the foreign key and the files actually being patched, so the caller can fix
+  // the header and resend.
+  it('foreign hunks throw even in continue mode (multi-file)', () => {
     const patch =
       '--- a/one.ts\n+++ b/one.ts\n@@ -1,1 +1,1 @@\n-alpha\n+ALPHA\n' +
       '--- a/three.ts\n+++ b/three.ts\n@@ -1,1 +1,1 @@\n-zzz\n+ZZZ\n'
 
-    const result = Patcher.Apply(patch, [
+    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, [
       new PatchInputFile('one.ts', 'alpha\n'),
-      new PatchInputFile('two.ts', 'beta\n')])
+      new PatchInputFile('two.ts', 'beta\n')]))
 
-    expect(result.Files[0].OutputFullText).toBe('ALPHA\n')
-    expect(result.Files[1].OutputFullText).toBe('beta\n')
-    for (const f of result.Files)
-      expect(f.Errors.length).toBe(0)
-    expect(result.Errors.filter(e => e.Type == 'FileMismatch').length).toBe(1)
-    expect(result.Errors[0].FileKey).toBe('three.ts') // errors name their file
+    expect(ex.Error.Type).toBe('FileMismatch')
+    expect(ex.Error.FileKey).toBe('three.ts')  // names the foreign file
+    expect(ex.Error.Hint).toContain('one.ts')  // and the valid roster
+    expect(ex.Error.Hint).toContain('two.ts')
   })
 
-  // Throw-mode invariant (ContinueOnError = false): every PatchError surfaces as a
-  // thrown PatchException — foreign-file mismatches included — so a returned result
-  // never carries errors an exceptions-channel caller would have to poll for.
+  // Throw-mode (ContinueOnError = false) naturally agrees: request errors throw
+  // in every mode.
   it('foreign hunks throw in throw mode', () => {
     const patch =
       '--- a/one.ts\n+++ b/one.ts\n@@ -1,1 +1,1 @@\n-alpha\n+ALPHA\n' +
@@ -387,7 +381,6 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
 
     expect(result.Files[0].Errors.length).toBe(0)
-    expect(result.Errors.length).toBe(0)
     expect(result.Files[0].OutputFullText).toBe('intro\ntail\n')
   })
 
@@ -410,7 +403,6 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
       new PatchInputFile('a.ts', 'keep\ndrop\n-- b.ts\n'),
       new PatchInputFile('b.ts', 'old\n')])
 
-    expect(result.Errors.length).toBe(0)
     for (const f of result.Files) expect(f.Errors.length).toBe(0)
     expect(result.Files[0].OutputFullText).toBe('keep\n-- b.ts\n')
     expect(result.Files[1].OutputFullText).toBe('new\n')
@@ -431,7 +423,6 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
 
     expect(result.Files[0].Errors.length).toBe(0)
-    expect(result.Errors.length).toBe(0)
     expect(result.Files[0].OutputFullText).toBe('docs\n context\n-old\n++ x/y.md\n+new\n end\ntail\n')
   })
 

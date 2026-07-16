@@ -5,7 +5,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Patcher, PatchInputFile, PatchParserException } from 'matchu-patchu';
+import { Patcher, PatchError, PatchException, PatchInputFile, PatchParserException } from 'matchu-patchu';
 import { z } from 'zod';
 
 const PkgVersion = (() => {
@@ -68,6 +68,12 @@ Docs: https://www.npmjs.com/package/matchu-patchu-mcp`);
   process.exit(0);
 }
 
+function patchFailureMessage(errors: PatchError[], note = ''): string {
+  const parts = [`Patch failed with ${errors.length} error(s)${note}:`];
+  for (const e of errors) parts.push('', e.toString());
+  return parts.join('\n');
+}
+
 function applyCore(filePath: string, diff: string, dryRun: boolean): { ok: boolean; message: string; patched?: string } {
   if (!existsSync(filePath))
     return { ok: false, message: `Error: file not found: ${filePath}` };
@@ -86,11 +92,8 @@ function applyCore(filePath: string, diff: string, dryRun: boolean): { ok: boole
 
     const out = result.Files[0];
 
-    if (out.Errors.length > 0) {
-      const parts = [`Patch failed with ${out.Errors.length} error(s):`];
-      for (const e of out.Errors) parts.push('', e.toString());
-      return { ok: false, message: parts.join('\n') };
-    }
+    if (out.Errors.length > 0)
+      return { ok: false, message: patchFailureMessage(out.Errors) };
 
     // Zero edits is a no-op, not a normal success: say why, and don't touch the file
     // (a rewrite of identical content still churns mtime/watchers).
@@ -112,6 +115,10 @@ function applyCore(filePath: string, diff: string, dryRun: boolean): { ok: boole
       patched: dryRun ? out.OutputFullText : undefined,
     };
   } catch (ex) {
+    // Request errors (e.g. hunks naming other files) throw in every mode — the
+    // whole patch was refused.
+    if (ex instanceof PatchException)
+      return { ok: false, message: patchFailureMessage(ex.Errors, ` (this tool patches only ${filePath})`) };
     if (ex instanceof PatchParserException)
       return { ok: false, message: `Error: failed to parse patch — ${ex.message}` };
     return { ok: false, message: `Error: ${ex instanceof Error ? ex.message : String(ex)}` };

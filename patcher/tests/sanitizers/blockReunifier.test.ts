@@ -146,7 +146,7 @@ Some explanatory text after.
     expect(sanitized).toBe(original)
   })
 
-  // External review 2026-07 (finding 15): a whitespace-prefixed " ```" is a hunk
+  // A whitespace-prefixed " ```" is a hunk
   // CONTEXT line (a diff patching markdown that contains code blocks), not a stray
   // fence. Deleting it stripped the hunk's anchor and the insert landed at the top
   // of the file with zero errors. Only column-0 fences are fences.

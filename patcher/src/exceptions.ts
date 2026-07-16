@@ -4,8 +4,9 @@ import { Yaml } from './utils/yaml.js';
 export type ErrorType = "ChunkDuplicated" | "ChunkOverlapping" | "MatchNotFound" | "MatchAmbiguous" | "FileMismatch";
     
 export class PatchException extends Error {
-    public Error: PatchError;
-    constructor (error: PatchError) { super(error.SuggestedFixYaml); this.Error = error; }
+    public Errors: PatchError[];
+    public get Error() { return this.Errors[0]; }
+    constructor (...errors: PatchError[]) { super(errors.map(e => e.SuggestedFixYaml).join('\n')); this.Errors = errors; }
 }
 
 export class PatchParserException extends Error {
@@ -15,8 +16,8 @@ export class PatchParserException extends Error {
 export class PatchError {
     public readonly Type: ErrorType;
     public readonly FailedMatch: Chunk;
-    // For FileMismatch: the foreign file key the hunk group named, so callers can
-    // say WHICH file's hunks were ignored (and match it against their own target).
+    // The file key(s) the error concerns: the foreign key a FileMismatch named, or
+    // the comma-joined candidate keys of an ambiguous headerless routing; null otherwise.
     public readonly FileKey: string | null;
     // Diagnosis computed against the file at error time (e.g. the quoted line
     // occurs inside one longer file line); null when no confident diagnosis.

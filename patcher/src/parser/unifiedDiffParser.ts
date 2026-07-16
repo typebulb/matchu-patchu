@@ -80,7 +80,7 @@ export class UnifiedDiffParser
         for (const raw of UnifiedDiffParser.StripCommonIndent(diff.replace(/\r\n/g, "\n")).split('\n')) {
             lineNo++;
 
-            // Self-referential context guard (finding 19): a raw line reading as
+            // Self-referential context guard: a raw line reading as
             // ' ' + <exact file line> is a context line whose CONTENT is diff-shaped
             // (files that contain diff literals — this repo's own tests). Content
             // evidence outranks structure heuristics: no indent-stripping, fence,

@@ -70,12 +70,6 @@ export class PatchOutputFile {
 /// </summary>
 export class PatchOutput {
     constructor (public Files: PatchOutputFile[]) {}
-    // Patch-scoped errors that belong to no input file: hunks naming files outside
-    // the input set (FileMismatch). Kept off the per-file channel so one foreign
-    // hunk cannot mark otherwise-clean files as failed — per-file Errors are about
-    // that file only. Loudness is preserved: throw-mode still throws these, and
-    // callers composing success replies must consult BOTH channels.
-    public Errors: PatchError[] = [];
 }
 
 export enum LineType { Context, Delete, Insert }

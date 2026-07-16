@@ -16,18 +16,18 @@ export class Patcher {
         diff = options.SanitizeDiff ? DiffSanitizer.Process(diff, fileKeys) : diff;
         const fileHunks = UnifiedDiffParser.Parse(diff, fileContents, options.Truncation, options.ControlChars);
 
-        const routingErrors = HeaderlessRouter.Route(fileHunks, files, options);
+        HeaderlessRouter.Route(fileHunks, files, options);
 
-        // Hunks naming files outside the input set are ignored by design (a hunk for
-        // a file we don't hold must not be guessed at) — but loudly: silent drops
-        // reported shredded or misdirected patches as clean zero-edit successes
-        // (finding 19). In throw-mode loud means thrown: an exceptions-channel
-        // caller must not have to poll Errors. In continue-mode they surface once,
-        // patch-scoped (PatchOutput.Errors), so clean files stay clean.
+        // Hunks naming files outside the input set are a defect of the request —
+        // provable from the diff and the input keys alone — so they throw in every
+        // mode, like a parse failure. ContinueOnError governs only per-file content
+        // mismatches discovered while matching.
+        const namedKeys = fileKeys.filter(k => k != "");
+        const rosterHint = namedKeys.length > 0 ? `Files being patched: ${namedKeys.join(", ")}.` : null;
         const foreignErrors = fileHunks.filter(g => g.Key != "" && !fileContents.has(g.Key))
-                                       .map(g => new PatchError("FileMismatch", g.Hunks[0].ToUnanchoredChunk(), g.Key));
-        if (foreignErrors.length > 0 && ! options.ContinueOnError)
-            throw new PatchException(foreignErrors[0]);
+                                       .map(g => new PatchError("FileMismatch", g.Hunks[0].ToUnanchoredChunk(), g.Key, rosterHint));
+        if (foreignErrors.length > 0)
+            throw new PatchException(...foreignErrors);
         
         const patchOutputFiles = files.map(f => {
             const targetSelection = new SelectionTarget(f.InputFullText, f.InputSelectedText);
@@ -52,8 +52,6 @@ export class Patcher {
                 hunks.some(h => h.ControlCharsSuspected)
             );
         });
-        const output = new PatchOutput(patchOutputFiles);
-        output.Errors = [...routingErrors, ...foreignErrors];
-        return output;
+        return new PatchOutput(patchOutputFiles);
     }
 }

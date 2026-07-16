@@ -74,8 +74,13 @@ const diff = readFileSync(0, 'utf-8');
 let content = '';
 try { content = readFileSync(filePath, 'utf-8'); } catch {}
 
-// Apply patch (Key='' triggers single-file fallback in parser)
-const result = Patcher.Apply(diff, [new PatchInputFile('', content)]);
+// Apply patch (Key='' triggers single-file fallback in parser). Request errors —
+// a malformed diff, or hunks naming files other than this one — throw: report
+// them and exit nonzero.
+const result = (() => {
+  try { return Patcher.Apply(diff, [new PatchInputFile('', content)]); }
+  catch (e) { console.error(e instanceof Error ? e.message : String(e)); process.exit(1); }
+})();
 const output = result.Files[0];
 
 // Report errors to stderr

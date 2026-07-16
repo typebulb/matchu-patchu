@@ -19,7 +19,7 @@ describe('DecorativeMarkerSanitizer', () => {
     expect(DiffSanitizer.Process(diff)).toBe(diff)
   })
 
-  // External review 2026-07 (finding 16): bare-@@ hunks (no counts) got none of the
+  // Bare-@@ hunks (no counts) got none of the
   // counted-body protection, so deleting a markdown setext underline ("------" =
   // delete "-----") matched the decoration rule and the edit silently no-opped.
   // A bare body is the run of +/-/space-prefixed lines after the bare @@.
@@ -32,7 +32,7 @@ describe('DecorativeMarkerSanitizer', () => {
     expect(result.Files[0].Errors.length).toBe(0)
   })
 
-  // Flip side of finding 16 — the sanitizer's ORIGINAL intent stays intact: a bare
+  // Flip side of the case above — the sanitizer's ORIGINAL intent stays intact: a bare
   // body ends at a blank line or any non-diff-shaped line, so decoration around a
   // bare-@@ hunk (before it, or blank-separated after it) is still stripped.
   it('strips decoration around bare hunks', () => {
