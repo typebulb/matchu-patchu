@@ -1,10 +1,11 @@
 import { ChunkApplier } from './applier/chunkApplier.js';
 import { UnifiedDiffParser } from './parser/unifiedDiffParser.js';
 import { HunkAnchorer } from './anchorer/hunkAnchorer.js';
-import { PatchInputFile, PatchOptions, PatchOutputFile, PatchOutput, Chunk, DiffLocation, Hunk, LineType, UniqueMatch } from './models.js';
+import { PatchInputFile, PatchOptions, PatchOutputFile, PatchOutput } from './models.js';
 import { PatchError, PatchException } from './exceptions.js';
 import { SelectionTarget } from './selectionTarget.js';
 import { DiffSanitizer } from './parser/diffSanitizer.js';
+import { HeaderlessRouter } from './headerlessRouter.js';
 
 export class Patcher {
     public static Apply(diff: string, files: PatchInputFile[], options?: PatchOptions)
@@ -15,6 +16,8 @@ export class Patcher {
         diff = options.SanitizeDiff ? DiffSanitizer.Process(diff, fileKeys) : diff;
         const fileHunks = UnifiedDiffParser.Parse(diff, fileContents, options.Truncation, options.ControlChars);
 
+        const routingErrors = HeaderlessRouter.Route(fileHunks, files, options);
+
         // Hunks naming files outside the input set are ignored by design (a hunk for
         // a file we don't hold must not be guessed at) — but loudly: silent drops
         // reported shredded or misdirected patches as clean zero-edit successes
@@ -22,7 +25,7 @@ export class Patcher {
         // caller must not have to poll Errors. In continue-mode they surface once,
         // patch-scoped (PatchOutput.Errors), so clean files stay clean.
         const foreignErrors = fileHunks.filter(g => g.Key != "" && !fileContents.has(g.Key))
-                                       .map(g => new PatchError("FileMismatch", Patcher.ForeignChunk(g.Hunks[0]), g.Key));
+                                       .map(g => new PatchError("FileMismatch", g.Hunks[0].ToUnanchoredChunk(), g.Key));
         if (foreignErrors.length > 0 && ! options.ContinueOnError)
             throw new PatchException(foreignErrors[0]);
         
@@ -50,19 +53,7 @@ export class Patcher {
             );
         });
         const output = new PatchOutput(patchOutputFiles);
-        output.Errors = foreignErrors;
+        output.Errors = [...routingErrors, ...foreignErrors];
         return output;
-    }
-
-    // Error-reporting stand-in for a hunk that was never anchored (it names a file
-    // that isn't being patched): its lines and diff location, no match.
-    static ForeignChunk(h: Hunk) {
-        return new Chunk(
-            [],
-            h.Lines.filter(l => l.Type == LineType.Delete).map(l => l.Text),
-            h.Lines.filter(l => l.Type == LineType.Insert).map(l => l.Text),
-            [],
-            UniqueMatch.NotFound,
-            new DiffLocation(h));
     }
 }

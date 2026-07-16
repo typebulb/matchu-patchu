@@ -122,6 +122,18 @@ export class Hunk {
     // Set by the parser under ControlCharPolicy 'warn' when this hunk's insert
     // lines carried raw control characters.
     public ControlCharsSuspected = false;
+
+    // Error-reporting stand-in Chunk for a hunk that was never anchored: its lines
+    // and diff location, no match.
+    public ToUnanchoredChunk() {
+        return new Chunk(
+            [],
+            this.Lines.filter(l => l.Type == LineType.Delete).map(l => l.Text),
+            this.Lines.filter(l => l.Type == LineType.Insert).map(l => l.Text),
+            [],
+            UniqueMatch.NotFound,
+            new DiffLocation(this));
+    }
 }
     
 export class Edit {

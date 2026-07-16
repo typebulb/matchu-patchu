@@ -1,6 +1,6 @@
 {
   "name": "matchu-patchu",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "The unified-diff patcher that's tolerant of form, strict about intent: repairs and applies sloppy AI-generated diffs when the intent is clear, fails precisely when it isn't.",
   "license": "Apache-2.0",
   "author": "Ben Albahari",

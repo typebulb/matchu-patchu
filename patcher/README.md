@@ -68,7 +68,7 @@ file.Fuzz;            // accumulated fuzz cost (0 = all exact)
 file.Errors;          // failures, each with a .SuggestedFixYaml
 ```
 
-Multi-file patches: pass one `PatchInputFile` per file; hunks are routed by the diff's file headers. An empty key (`''`) opts into single-file fallback matching, where headers are matched loosely.
+Multi-file patches: pass one `PatchInputFile` per file; hunks are routed by the diff's file headers — or by content when a leading group has no headers and exactly one file matches (zero or several matches fail loudly). Errors that can't be pinned to a held file land on `PatchOutput.Errors` rather than any `file.Errors` — check both. An empty key (`''`) opts into single-file fallback matching, where headers are matched loosely.
 
 ## MCP server
 
