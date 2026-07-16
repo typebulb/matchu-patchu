@@ -8,7 +8,6 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { TestHelpers } from '../helpers'
 import { Patcher, PatchInputFile, PatchOptions, PatchException } from '../../dist/index.js'
 
 const project = () => [
@@ -61,17 +60,20 @@ describe('Multi-input changesets', () => {
 
   // Pins current behavior: only git a/ b/ prefixes canonicalize; ./ fails loud.
   // If ./ tolerance is ever adopted, this is the test that flips.
-  it('./-prefixed headers do not route — FileMismatch throws', () => {
+  it('./-prefixed headers do not route — FileMismatch report entry', () => {
     const patch = `--- ./styles.css
 +++ ./styles.css
 @@ -1,1 +1,1 @@
 -body { color: red }
 +body { color: blue }
 `
-    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, project()))
-    expect(ex.Error.Type).toBe('FileMismatch')
-    expect(ex.Error.FileKey).toBe('./styles.css')
-    expect(ex.Error.Hint).toContain('styles.css') // roster in the hint
+    const result = Patcher.Apply(patch, project())
+
+    expect(result.Files[1].OutputFullText).toBe('body { color: red }\n') // untouched
+    expect(result.Files[1].Errors.length).toBe(0)
+    const report = result.Files.find(f => f.Key === './styles.css')!
+    expect(report.Errors[0].Type).toBe('FileMismatch')
+    expect(report.Errors[0].Hint).toContain('styles.css') // roster in the hint
   })
 
   it('keeps output order = input order even when the diff orders files differently', () => {
@@ -215,18 +217,20 @@ describe('Multi-input changesets', () => {
     expect(result.Files[1].OutputFullText).toBe('body { color: blue }\n')
   })
 
-  // Pins current behavior: keys are case-sensitive. A case-drifted header throws a
-  // FileMismatch naming the drifted path.
-  it('case-mismatched headers do not route — FileMismatch throws', () => {
+  // Pins current behavior: keys are case-sensitive. A case-drifted header gets a
+  // FileMismatch report entry naming the drifted path.
+  it('case-mismatched headers do not route — FileMismatch report entry', () => {
     const patch = `--- Styles.css
 +++ Styles.css
 @@ -1,1 +1,1 @@
 -body { color: red }
 +body { color: blue }
 `
-    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, project()))
-    expect(ex.Error.Type).toBe('FileMismatch')
-    expect(ex.Error.FileKey).toBe('Styles.css')
+    const result = Patcher.Apply(patch, project())
+
+    expect(result.Files[1].OutputFullText).toBe('body { color: red }\n') // untouched
+    const report = result.Files.find(f => f.Key === 'Styles.css')!
+    expect(report.Errors[0].Type).toBe('FileMismatch')
   })
 })
 
@@ -294,9 +298,9 @@ describe('Headerless routing in keyed mode', () => {
     expect(result.Files[1].OutputFullText).toBe('body { color: red }\n')
   })
 
-  // Routing failures are request errors — the diff is underspecified for this
-  // input set — so they throw in every mode, like a parse failure.
-  it('throws when headerless content matches multiple files', () => {
+  // Routing failures are reported as a ''-keyed entry — the key the diff itself
+  // used for the headerless group.
+  it('reports a MatchAmbiguous entry when headerless content matches multiple files', () => {
     const files = [
       new PatchInputFile('a.css', 'body { color: red }\n'),
       new PatchInputFile('b.css', 'body { color: red }\n'),
@@ -305,20 +309,29 @@ describe('Headerless routing in keyed mode', () => {
 -body { color: red }
 +body { color: blue }
 `
-    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, files))
-    expect(ex.Error.Type).toBe('MatchAmbiguous')
-    expect(ex.Error.FileKey).toBe('a.css, b.css')
-    expect(ex.Error.Hint).toContain('file headers')
+    const result = Patcher.Apply(patch, files)
+
+    for (const f of result.Files.slice(0, 2)) {
+      expect(f.OutputFullText).toBe(f.InputFullText)
+      expect(f.Errors.length).toBe(0)
+    }
+    const report = result.Files.find(f => f.Key === '')!
+    expect(report.Errors[0].Type).toBe('MatchAmbiguous')
+    expect(report.Errors[0].FileKey).toBe('a.css, b.css')
+    expect(report.Errors[0].Hint).toContain('file headers')
   })
 
-  it('throws when headerless content matches no file', () => {
+  it('reports a MatchNotFound entry when headerless content matches no file', () => {
     const patch = `@@ -1,1 +1,1 @@
 -nothing like this exists
 +replacement
 `
-    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, project()))
-    expect(ex.Error.Type).toBe('MatchNotFound')
-    expect(ex.Error.Hint).toContain('file headers')
+    const result = Patcher.Apply(patch, project())
+
+    for (const f of result.Files.slice(0, 3)) expect(f.OutputFullText).toBe(f.InputFullText)
+    const report = result.Files.find(f => f.Key === '')!
+    expect(report.Errors[0].Type).toBe('MatchNotFound')
+    expect(report.Errors[0].Hint).toContain('file headers')
   })
 
   it('throw mode: unroutable headerless hunk throws', () => {

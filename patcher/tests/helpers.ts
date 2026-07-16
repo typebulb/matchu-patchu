@@ -4,7 +4,7 @@
  */
 
 import { expect } from 'vitest'
-import { Patcher, PatchException } from '../dist/index.js'
+import { Patcher } from '../dist/index.js'
 
 interface FileInput {
   Key: string
@@ -204,17 +204,6 @@ export class TestHelpers {
    */
   static assertArrayEqual<T>(actual: T[], expected: T[], message: string = 'Arrays do not match'): void {
     expect(actual).toEqual(expected)
-  }
-
-  /**
-   * Run fn expecting a PatchException; assert and return it for inspection
-   */
-  static assertThrows(fn: () => unknown): PatchException {
-    try { fn() } catch (e) {
-      expect(e).toBeInstanceOf(PatchException)
-      return e as PatchException
-    }
-    throw new Error('Expected PatchException, but nothing was thrown')
   }
 }
 

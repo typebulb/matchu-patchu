@@ -316,43 +316,58 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     expect(result.Files[0].Errors.length).toBe(0)
   })
 
-  // A diff addressing files we don't hold is a defect of the REQUEST — provable
-  // from the diff and the input keys alone, before reading any file content — so
-  // it throws in BOTH modes, like a parse failure. ContinueOnError governs only
-  // per-file content mismatches. (These hunks were once dropped without a trace,
-  // reporting misdirected patches as clean zero-edit successes.)
-  it('foreign hunks throw in single-file mode', () => {
+  // Hunk groups the input set can't account for are reported as entries in Files,
+  // keyed by the name the diff used — the year-old per-file error channel, so the
+  // year-old aggregate check (any file has Errors) catches them with no new code.
+  // (These hunks were once dropped without a trace, reporting misdirected patches
+  // as clean zero-edit successes.)
+  it('foreign hunks become report entries in single-file mode', () => {
     const original = 'alpha\nbeta\n'
     const patch =
       '--- a/one.ts\n+++ b/one.ts\n@@ -1,1 +1,1 @@\n-alpha\n+ALPHA\n' +
       '--- a/two.ts\n+++ b/two.ts\n@@ -1,1 +1,1 @@\n-zzz\n+ZZZ\n'
 
-    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, TestHelpers.singleFile(original)))
-    expect(ex.Error.Type).toBe('FileMismatch')
-    expect(ex.Errors.length).toBe(2) // every foreign group reported, not just the first
+    const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
+
+    expect(result.Files[0].OutputFullText).toBe(original) // held buffer untouched, clean
+    expect(result.Files[0].Errors.length).toBe(0)
+    const reports = result.Files.slice(1)
+    expect(reports.map(f => f.Key)).toEqual(['one.ts', 'two.ts'])
+    for (const f of reports) {
+      expect(f.Errors.length).toBe(1)
+      expect(f.Errors[0].Type).toBe('FileMismatch')
+      expect(f.OutputFullText).toBe('') // report entry: no content, no edits
+      expect(f.Edits.length).toBe(0)
+    }
   })
 
-  // Multi-file mode: a hunk group keyed outside the input set fails the whole
-  // patch atomically — no partial apply of the matching files. The error names
-  // the foreign key and the files actually being patched, so the caller can fix
-  // the header and resend.
-  it('foreign hunks throw even in continue mode (multi-file)', () => {
+  // Multi-file mode: matching files apply (year-old partial semantics), and the
+  // foreign group gets a report entry whose error names the foreign key and the
+  // files actually being patched, so the caller can fix the header and resend.
+  it('foreign hunks become a report entry in multi-file mode', () => {
     const patch =
       '--- a/one.ts\n+++ b/one.ts\n@@ -1,1 +1,1 @@\n-alpha\n+ALPHA\n' +
       '--- a/three.ts\n+++ b/three.ts\n@@ -1,1 +1,1 @@\n-zzz\n+ZZZ\n'
 
-    const ex = TestHelpers.assertThrows(() => Patcher.Apply(patch, [
+    const result = Patcher.Apply(patch, [
       new PatchInputFile('one.ts', 'alpha\n'),
-      new PatchInputFile('two.ts', 'beta\n')]))
+      new PatchInputFile('two.ts', 'beta\n')])
 
-    expect(ex.Error.Type).toBe('FileMismatch')
-    expect(ex.Error.FileKey).toBe('three.ts')  // names the foreign file
-    expect(ex.Error.Hint).toContain('one.ts')  // and the valid roster
-    expect(ex.Error.Hint).toContain('two.ts')
+    expect(result.Files[0].OutputFullText).toBe('ALPHA\n')
+    expect(result.Files[1].OutputFullText).toBe('beta\n')
+    expect(result.Files[0].Errors.length).toBe(0)
+    expect(result.Files[1].Errors.length).toBe(0)
+
+    const report = result.Files[2]
+    expect(report.Key).toBe('three.ts')
+    expect(report.Errors[0].Type).toBe('FileMismatch')
+    expect(report.Errors[0].FileKey).toBe('three.ts')  // names the foreign file
+    expect(report.Errors[0].Hint).toContain('one.ts')  // and the valid roster
+    expect(report.Errors[0].Hint).toContain('two.ts')
   })
 
-  // Throw-mode (ContinueOnError = false) naturally agrees: request errors throw
-  // in every mode.
+  // Throw-mode (ContinueOnError = false) keeps the year-old invariant: every
+  // PatchError surfaces as a thrown PatchException, foreign groups included.
   it('foreign hunks throw in throw mode', () => {
     const patch =
       '--- a/one.ts\n+++ b/one.ts\n@@ -1,1 +1,1 @@\n-alpha\n+ALPHA\n' +

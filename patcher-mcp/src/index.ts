@@ -5,7 +5,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Patcher, PatchError, PatchException, PatchInputFile, PatchParserException } from 'matchu-patchu';
+import { Patcher, PatchError, PatchInputFile, PatchParserException } from 'matchu-patchu';
 import { z } from 'zod';
 
 const PkgVersion = (() => {
@@ -92,8 +92,13 @@ function applyCore(filePath: string, diff: string, dryRun: boolean): { ok: boole
 
     const out = result.Files[0];
 
-    if (out.Errors.length > 0)
-      return { ok: false, message: patchFailureMessage(out.Errors) };
+    // Aggregate across ALL entries: foreign hunk groups arrive as report entries
+    // appended after the held file, and must not read as a clean apply.
+    const errors = result.Files.flatMap(f => f.Errors);
+    if (errors.length > 0) {
+      const note = errors.some(e => e.Type === 'FileMismatch') ? ` (this tool patches only ${filePath})` : '';
+      return { ok: false, message: patchFailureMessage(errors, note) };
+    }
 
     // Zero edits is a no-op, not a normal success: say why, and don't touch the file
     // (a rewrite of identical content still churns mtime/watchers).
@@ -115,10 +120,6 @@ function applyCore(filePath: string, diff: string, dryRun: boolean): { ok: boole
       patched: dryRun ? out.OutputFullText : undefined,
     };
   } catch (ex) {
-    // Request errors (e.g. hunks naming other files) throw in every mode — the
-    // whole patch was refused.
-    if (ex instanceof PatchException)
-      return { ok: false, message: patchFailureMessage(ex.Errors, ` (this tool patches only ${filePath})`) };
     if (ex instanceof PatchParserException)
       return { ok: false, message: `Error: failed to parse patch — ${ex.message}` };
     return { ok: false, message: `Error: ${ex instanceof Error ? ex.message : String(ex)}` };

@@ -16,18 +16,23 @@ export class Patcher {
         diff = options.SanitizeDiff ? DiffSanitizer.Process(diff, fileKeys) : diff;
         const fileHunks = UnifiedDiffParser.Parse(diff, fileContents, options.Truncation, options.ControlChars);
 
-        HeaderlessRouter.Route(fileHunks, files, options);
+        const routingErrors = HeaderlessRouter.Route(fileHunks, files, options);
 
-        // Hunks naming files outside the input set are a defect of the request —
-        // provable from the diff and the input keys alone — so they throw in every
-        // mode, like a parse failure. ContinueOnError governs only per-file content
-        // mismatches discovered while matching.
+        // Hunk groups the input set can't account for become report entries in Files
+        // under the diff's own key — the per-file error channel every caller already
+        // reads (dropping them silently reported misdirected patches as clean
+        // successes). Content fields are empty: the file isn't held.
         const namedKeys = fileKeys.filter(k => k != "");
         const rosterHint = namedKeys.length > 0 ? `Files being patched: ${namedKeys.join(", ")}.` : null;
-        const foreignErrors = fileHunks.filter(g => g.Key != "" && !fileContents.has(g.Key))
-                                       .map(g => new PatchError("FileMismatch", g.Hunks[0].ToUnanchoredChunk(), g.Key, rosterHint));
-        if (foreignErrors.length > 0)
-            throw new PatchException(...foreignErrors);
+        const reportEntry = (key: string, errors: PatchError[]) =>
+            new PatchOutputFile(key, 0, [], "", "", "", errors);
+        const reportFiles = fileHunks.filter(g => g.Key != "" && !fileContents.has(g.Key))
+            .map(g => reportEntry(g.Key, [new PatchError("FileMismatch", g.Hunks[0].ToUnanchoredChunk(), g.Key, rosterHint)]));
+        if (routingErrors.length > 0)
+            reportFiles.unshift(reportEntry("", routingErrors));
+        const reportErrors = reportFiles.flatMap(f => f.Errors);
+        if (reportErrors.length > 0 && ! options.ContinueOnError)
+            throw new PatchException(reportErrors[0]);
         
         const patchOutputFiles = files.map(f => {
             const targetSelection = new SelectionTarget(f.InputFullText, f.InputSelectedText);
@@ -52,6 +57,6 @@ export class Patcher {
                 hunks.some(h => h.ControlCharsSuspected)
             );
         });
-        return new PatchOutput(patchOutputFiles);
+        return new PatchOutput([...patchOutputFiles, ...reportFiles]);
     }
 }

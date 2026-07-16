@@ -4,9 +4,8 @@ import { Yaml } from './utils/yaml.js';
 export type ErrorType = "ChunkDuplicated" | "ChunkOverlapping" | "MatchNotFound" | "MatchAmbiguous" | "FileMismatch";
     
 export class PatchException extends Error {
-    public Errors: PatchError[];
-    public get Error() { return this.Errors[0]; }
-    constructor (...errors: PatchError[]) { super(errors.map(e => e.SuggestedFixYaml).join('\n')); this.Errors = errors; }
+    public Error: PatchError;
+    constructor (error: PatchError) { super(error.SuggestedFixYaml); this.Error = error; }
 }
 
 export class PatchParserException extends Error {

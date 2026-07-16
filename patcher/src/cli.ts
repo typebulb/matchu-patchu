@@ -74,18 +74,19 @@ const diff = readFileSync(0, 'utf-8');
 let content = '';
 try { content = readFileSync(filePath, 'utf-8'); } catch {}
 
-// Apply patch (Key='' triggers single-file fallback in parser). Request errors —
-// a malformed diff, or hunks naming files other than this one — throw: report
-// them and exit nonzero.
+// Apply patch (Key='' triggers single-file fallback in parser). A malformed diff
+// throws: report it and exit nonzero.
 const result = (() => {
   try { return Patcher.Apply(diff, [new PatchInputFile('', content)]); }
   catch (e) { console.error(e instanceof Error ? e.message : String(e)); process.exit(1); }
 })();
 const output = result.Files[0];
 
-// Report errors to stderr
-if (output.Errors.length > 0) {
-  for (const err of output.Errors)
+// Report errors to stderr — aggregated across ALL entries: foreign hunk groups
+// arrive as report entries appended after the target file.
+const errors = result.Files.flatMap(f => f.Errors);
+if (errors.length > 0) {
+  for (const err of errors)
     console.error(err.SuggestedFixYaml);
 }
 
@@ -95,10 +96,10 @@ const fuzz = output.Fuzz;
 console.error(
   `${n} edit(s)` +
   `${fuzz ? ` fuzz=${fuzz}` : ''}` +
-  `${output.Errors.length ? ` errors=${output.Errors.length}` : ''}`
+  `${errors.length ? ` errors=${errors.length}` : ''}`
 );
 
-if (n === 0 && output.Errors.length > 0) process.exit(1);
+if (n === 0 && errors.length > 0) process.exit(1);
 
 // Write result
 if (dryRun) {
