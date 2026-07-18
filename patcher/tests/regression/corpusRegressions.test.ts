@@ -602,4 +602,51 @@ describe('Corpus regressions (Diff-XYZ 2026-07)', () => {
     expect(result.Files[0].OutputFullText).toBe('alpha\ngamma\n')
     expect(result.Files[0].Errors.length).toBe(0)
   })
+
+  // Production capture 2026-07-18: a malformed hunk carrying only a context line
+  // — its change markers lost — was silently dropped while its sibling hunks
+  // applied: success reported, file diverged from belief. A content-free @@ hunk
+  // can never be intentional and has no unambiguous repair (adds or deletes?),
+  // so the parser rejects the whole diff, all-or-nothing, like truncation.
+  it('context-only hunk rejects at parse time', () => {
+    const original = 'alpha\nbeta\ngamma\n'
+    const patch = '@@ -1,2 +1,2 @@\n alpha\n beta\n'
+
+    expect(() => Patcher.Apply(patch, TestHelpers.singleFile(original)))
+      .toThrow(/no '\+' or '-' lines.*Nothing was applied/s)
+  })
+
+  // The capture's shape: the content-free hunk rode alongside valid hunks, which
+  // applied — that partial success is what made the silence expensive. Rejection
+  // must be atomic: the valid sibling hunk applies nothing either.
+  it('context-only hunk among valid hunks rejects the whole patch', () => {
+    const original = '.talesNone { color: red; }\n.grid { gap: 4px; }\n'
+    const patch = '@@\n-.grid { gap: 4px; }\n+.grid { gap: 8px; }\n@@\n .talesNone { color: red; }\n'
+
+    expect(() => Patcher.Apply(patch, TestHelpers.singleFile(original)))
+      .toThrow(/no '\+' or '-' lines/)
+  })
+
+  // Prose around a diff is not a hunk: commentary after a closed ```diff fence
+  // flows through the same pure-context commit path and must stay silently
+  // tolerated — only @@-headed bodies are policed.
+  it('prose after a closed fence stays tolerated', () => {
+    const original = 'alpha\nbeta\n'
+    const patch = '```diff\n@@ -1,2 +1,2 @@\n alpha\n-beta\n+gamma\n```\nThis change renames beta.\n'
+
+    const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
+    expect(result.Files[0].OutputFullText).toBe('alpha\ngamma\n')
+    expect(result.Files[0].Errors.length).toBe(0)
+  })
+
+  // A bare @@ separator followed by a blank line carries no content at all —
+  // decorative slop, not a lost edit; stays tolerated.
+  it('bare hunk header with blank body stays tolerated', () => {
+    const original = 'alpha\nbeta\n'
+    const patch = '@@\n\n@@ -1,2 +1,2 @@\n alpha\n-beta\n+gamma\n'
+
+    const result = Patcher.Apply(patch, TestHelpers.singleFile(original))
+    expect(result.Files[0].OutputFullText).toBe('alpha\ngamma\n')
+    expect(result.Files[0].Errors.length).toBe(0)
+  })
 })

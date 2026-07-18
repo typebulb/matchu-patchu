@@ -44,6 +44,13 @@ export class HunkBuilder {
     // (Trailing prose already clears the flag via the pure-context commit path.)
     public ClearTruncation() { this.LastHunkTruncated = false; }
 
+    // Diff line of the first @@-headed body with real content but no change lines.
+    // Such a hunk can never be intentional (its '+'/'-' markers were lost, and the
+    // loss is ambiguous — adds or deletes?), so the parser rejects the whole diff
+    // instead of silently dropping it. Bodies outside any hunk (prose before or
+    // after a diff) and blank-only bodies keep flowing through silently.
+    public ContextOnlyHunkLine: number | null = null;
+
     public CommitIfAny(hdr: Header, body: string[], fileLines?: string[])
     {
         if (body.length == 0) return;
@@ -53,6 +60,8 @@ export class HunkBuilder {
         // pure context – skip
         if (!blankContextDeletion && !body.some(l => l.length > 0 && (l[0] == '-' || l[0] == '+'))) {
             this.LastHunkTruncated = false;
+            if (hdr.DiffBodyStartLine >= 0 && this.ContextOnlyHunkLine == null && body.some(l => l.trim().length > 0))
+                this.ContextOnlyHunkLine = hdr.DiffBodyStartLine;
             body.length = 0;
             return;
         }

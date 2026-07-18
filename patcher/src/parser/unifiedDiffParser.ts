@@ -96,7 +96,10 @@ export class UnifiedDiffParser
             // fenced ```diff blocks
             if (line.startsWith("```diff")) { inFence = true; continue; }
             if (!inFence && line.startsWith("```") ) { continue; } // stray fence line outside a diff fence
-            if (inFence && line.startsWith("```") ) { hunkBuilder.CommitIfAny(header, body, currentFileLines); hunkBuilder.ClearTruncation(); inFence = false; inHunkBody = false; continue; }
+            // The fence-close also ends any open hunk: what follows is commentary,
+            // not the @@ header's body, so its DiffBodyStartLine must not attribute
+            // later pure-context prose to a hunk.
+            if (inFence && line.startsWith("```") ) { hunkBuilder.CommitIfAny(header, body, currentFileLines); hunkBuilder.ClearTruncation(); header.DiffBodyStartLine = -1; inFence = false; inHunkBody = false; continue; }
 
             if (UnifiedDiffParser.IsMeta(line)) continue;
 
@@ -125,6 +128,15 @@ export class UnifiedDiffParser
 
         hunkBuilder.CommitIfAny(header, body, currentFileLines);
         const hunks = hunkBuilder.Hunks;
+        // A hunk that expresses no change is rejected before truncation policing:
+        // when a cutoff tears a hunk right after its context lines, the tear reads
+        // as content-free and this message's fix (restore the markers / re-send)
+        // covers that cause too.
+        if (hunkBuilder.ContextOnlyHunkLine != null)
+            throw new PatchParserException(
+                `The hunk at diff line ${hunkBuilder.ContextOnlyHunkLine} has no '+' or '-' lines — only context — so it ` +
+                "expresses no change. If it was meant to edit, its change markers were lost. Nothing was " +
+                "applied; re-send the diff with added lines prefixed '+' and removed lines prefixed '-'.");
         // The policy decides the verdict only for a SURVIVING signature — completion
         // evidence (trailing prose, fence-close) already cleared it in the builder.
         if (hunkBuilder.LastHunkTruncated && truncation != 'ignore') {
